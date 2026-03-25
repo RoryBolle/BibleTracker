@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../data/reading_plan_service.dart';
 import '../data/reading_repository.dart';
 import '../models/reading_entry.dart';
 import '../providers/reading_providers.dart';
@@ -9,11 +10,57 @@ import '../widgets/progress_ring.dart';
 import '../widgets/todays_reading_bar.dart';
 import 'detail_screen.dart';
 
-class HomeScreen extends ConsumerWidget {
+class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends ConsumerState<HomeScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _maybeShowPlanPrompt());
+  }
+
+  Future<void> _maybeShowPlanPrompt() async {
+    if (!mounted) return;
+    final show = await ReadingPlanService.shouldShowPrompt();
+    if (!show || !mounted) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('OTC Reading Plan 2026'),
+        content: const Text(
+          'Would you like to pre-load the OTC Reading Plan 2026 '
+          'entries into your tracker?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('No thanks'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Yes, load it'),
+          ),
+        ],
+      ),
+    );
+
+    await ReadingPlanService.markOffered();
+
+    if (confirmed == true && mounted) {
+      await ReadingPlanService.insertPlan();
+      ref.invalidate(readingStatsProvider);
+      ref.invalidate(todayEntriesProvider);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final statsAsync = ref.watch(readingStatsProvider);
     final todayEntriesAsync = ref.watch(todayEntriesProvider);
 

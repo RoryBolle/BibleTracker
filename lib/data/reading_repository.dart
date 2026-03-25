@@ -119,6 +119,20 @@ class ReadingRepository {
     await db.delete(DbHelper.table, where: 'id = ?', whereArgs: [id]);
   }
 
+  /// Insert many entries efficiently in a single transaction.
+  Future<void> bulkInsertEntries(List<ReadingEntry> entries) async {
+    final db = await _db;
+    await db.transaction((txn) async {
+      for (final entry in entries) {
+        await txn.insert(
+          DbHelper.table,
+          entry.toMap(),
+          conflictAlgorithm: ConflictAlgorithm.ignore,
+        );
+      }
+    });
+  }
+
   // ─── Read ────────────────────────────────────────────────────────────────
 
   /// Fetch all entries, newest first.
